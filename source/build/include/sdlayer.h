@@ -89,6 +89,8 @@ static inline void idle(int const msec = 1)
 {
 #ifdef _WIN32
     Sleep(msec);
+#elif defined __PSP2__
+	sceKernelDelayThread(msec * 1000);
 #else
     timespec req = { 0, msec * 1000000 };
     do { } while (nanosleep(&req, &req));

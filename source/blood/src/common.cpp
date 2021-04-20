@@ -51,12 +51,12 @@ void clearGrpNamePtr(void)
 
 const char *G_DefaultGrpFile(void)
 {
-    return "nblood.pk3";
+    return "ux0:data/NBlood/nblood.pk3";
 }
 
 const char *G_DefaultDefFile(void)
 {
-    return "blood.def";
+    return "ux0:data/NBlood/blood.def";
 }
 
 const char *G_GrpFile(void)

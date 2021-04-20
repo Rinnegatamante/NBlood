@@ -12,6 +12,9 @@ int32_t mutex_init(mutex_t *mutex)
     // https://preshing.com/20111124/always-use-a-lightweight-mutex/
     InitializeCriticalSection(mutex);
     return 0;
+#elif defined __PSP2__
+	*mutex = sceKernelCreateMutex("mutex", 0, 0, NULL);
+	return 0;
 #elif SDL_MAJOR_VERSION == 1
     if (mutex)
     {
@@ -31,6 +34,8 @@ void mutex_destroy(mutex_t *mutex)
     *mutex = 0;
 #elif defined _WIN32
     DeleteCriticalSection(mutex);
+#elif defined __PSP2__
+	sceKernelDeleteMutex(*mutex);
 #elif SDL_MAJOR_VERSION == 1
     if (mutex)
     {

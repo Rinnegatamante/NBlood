@@ -10,6 +10,11 @@
 
 #include <time.h>
 
+#ifdef __PSP2__
+#define CLOCK_MONOTONIC 0
+extern int clock_gettime(int clk_id, struct timespec *tp);
+#endif
+
 #ifdef _WIN32
 # include "winbits.h"
 # include <mmsystem.h>

@@ -35,6 +35,16 @@
 #ifndef ENET_INCLUDE_H
 #define ENET_INCLUDE_H
 
+#ifdef __PSP2__
+#include <vitasdk.h>
+#define IPV6_V6ONLY 0
+#define SOMAXCONN 0
+#define POLLIN 0
+#define POLLOUT 0
+#define TCP_NODELAY 0
+#define IPPROTO_IPV6 0
+#endif
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -141,13 +151,17 @@
     #define ENET_SOCKETSET_CHECK(sockset, socket)  FD_ISSET(socket, &(sockset))
 #else
     #include <sys/types.h>
+#ifndef __PSP2__
     #include <sys/ioctl.h>
+#endif
     #include <sys/time.h>
     #include <sys/socket.h>
+#ifndef __PSP2__
     #include <poll.h>
     #include <arpa/inet.h>
     #include <netinet/in.h>
     #include <netinet/tcp.h>
+#endif
     #include <netdb.h>
     #include <unistd.h>
     #include <string.h>
@@ -989,6 +1003,9 @@ extern "C" {
 # define enet_gettime clock_gettime
 #endif
 
+#ifdef __PSP2__
+#define CLOCK_MONOTONIC 0
+#endif
 
 #ifdef __cplusplus
 }
@@ -996,6 +1013,34 @@ extern "C" {
 
 #if defined(ENET_IMPLEMENTATION) && !defined(ENET_IMPLEMENTATION_DONE)
 #define ENET_IMPLEMENTATION_DONE 1
+
+#ifdef __PSP2__
+int clock_gettime(int clk_id, struct timespec *tp)
+{
+	if (clk_id == CLOCK_MONOTONIC) {
+		SceKernelSysClock ticks;
+		sceKernelGetProcessTime(&ticks);
+
+		tp->tv_sec = ticks / (1000 * 1000);
+		tp->tv_nsec = (ticks * 1000) % (1000 * 1000 * 1000);
+
+		return 0;
+	} else if (clk_id == CLOCK_REALTIME) {
+		time_t seconds;
+		SceDateTime time;
+		sceRtcGetCurrentClockLocalTime(&time);
+
+		sceRtcGetTime_t(&time, &seconds);
+
+		tp->tv_sec = seconds;
+		tp->tv_nsec = time.microsecond * 1000;
+
+		return 0;
+	}
+
+	return -ENOSYS;
+}
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -4410,7 +4455,9 @@ extern "C" {
         host->commandCount                  = 0;
         host->bufferCount                   = 0;
         host->checksum                      = NULL;
+#ifndef __PSP2__
         host->receivedAddress.host          = ENET_HOST_ANY;
+#endif
         host->receivedAddress.port          = 0;
         host->receivedData                  = NULL;
         host->receivedDataLength            = 0;
@@ -5052,8 +5099,9 @@ extern "C" {
         sin.sin6_port = ENET_HOST_TO_NET_16 (address->port);
         sin.sin6_addr = address->host;
         sin.sin6_scope_id = address->sin6_scope_id;
-
+#ifndef __PSP2__
         err = getnameinfo((struct sockaddr *) &sin, sizeof(sin), name, nameLength, NULL, 0, NI_NAMEREQD);
+#endif
         if (!err) {
             if (name != NULL && nameLength > 0 && !memchr(name, '\0', nameLength)) {
                 return -1;
@@ -5078,7 +5126,9 @@ extern "C" {
             sin.sin6_scope_id   = address->sin6_scope_id;
         } else {
             sin.sin6_port       = 0;
+#ifndef __PSP2__
             sin.sin6_addr       = ENET_HOST_ANY;
+#endif
             sin.sin6_scope_id   = 0;
         }
 
@@ -5305,11 +5355,15 @@ extern "C" {
 
         timeVal.tv_sec  = timeout / 1000;
         timeVal.tv_usec = (timeout % 1000) * 1000;
-
+#ifndef __PSP2__
         return select(maxSocket + 1, readSet, writeSet, NULL, &timeVal);
+#else
+		return 0;
+#endif
     }
 
     int enet_socket_wait(ENetSocket socket, enet_uint32 *condition, enet_uint64 timeout) {
+#ifndef __PSP2__
         struct pollfd pollSocket;
         int pollCount;
 
@@ -5349,7 +5403,7 @@ extern "C" {
         if (pollSocket.revents & POLLIN) {
             *condition |= ENET_SOCKET_WAIT_RECEIVE;
         }
-
+#endif
         return 0;
     } /* enet_socket_wait */
 
@@ -5520,7 +5574,9 @@ extern "C" {
             sin.sin6_scope_id   = address->sin6_scope_id;
         } else   {
             sin.sin6_port       = 0;
+#ifndef __PSP2__
             sin.sin6_addr       = in6addr_any;
+#endif
             sin.sin6_scope_id   = 0;
         }
 

@@ -120,6 +120,10 @@ char *Bgethomedir(void)
     if (drv)
         drv[1] = '\0';
     return Xstrdup(cwd);
+#elif defined(__PSP2__)
+	char cwd[BMAX_PATH] = {0};
+	getcwd(cwd, BMAX_PATH);
+	return Xstrdup(cwd);
 #else
     char *e = getenv("HOME");
     if (!e) return NULL;
@@ -588,6 +592,8 @@ int Bgetpagesize(void)
         SYSTEM_INFO system_info;
         GetSystemInfo(&system_info);
         pageSize = system_info.dwPageSize;
+#elif defined(__PSP2__)
+		pageSize = BMAXPAGESIZE;
 #else
         pageSize = sysconf(_SC_PAGESIZE);
 #endif
@@ -633,7 +639,7 @@ size_t Bgetsysmemsize(void)
         FreeLibrary(lib);
     }
     else initprintf("Bgetsysmemsize(): unable to load KERNEL32.DLL!\n");
-#elif (defined(_SC_PAGE_SIZE) || defined(_SC_PAGESIZE)) && defined(_SC_PHYS_PAGES) && !defined(GEKKO)
+#elif (defined(_SC_PAGE_SIZE) || defined(_SC_PAGESIZE)) && defined(_SC_PHYS_PAGES) && !defined(GEKKO) && !defined(__PSP2__)
 #ifdef _SC_PAGE_SIZE
     int64_t const scpagesiz = sysconf(_SC_PAGE_SIZE);
 #else

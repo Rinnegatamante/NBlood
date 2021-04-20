@@ -340,6 +340,13 @@ ifeq ($(PLATFORM),WII)
     engine_objs += wiibits.cpp
     LINKERFLAGS += -Wl,-wrap,c_default_exceptionhandler
 endif
+ifeq ($(PLATFORM),PSP2)
+    LIBS += -lvorbisfile -lvorbis -logg -lmpg123 -lmikmod -lz -lvita2d -lSceCommonDialog_stub \
+            -lSceDisplay_stub -lSceGxm_stub -lSceHid_stub -lSceAudio_stub -lSceLibKernel_stub -lpng \
+    		-lz -lSceDisplay_stub -lSceMotion_stub -lSceAppMgr_stub -lSceSysmodule_stub -lSceCtrl_stub \
+    		-lSceTouch_stub -lSceMotion_stub -lSceAppMgr_stub -lSceAppUtil_stub -lScePgf_stub -ljpeg \
+    		-lSceRtc_stub -lScePower_stub -lSDL_mixer -lSDL -lmikmod -lspeexdsp -lSceNet_stub -lSceNetCtl_stub
+endif
 ifeq ($(RENDERTYPE),SDL)
     engine_objs += sdlayer.cpp
 
@@ -1416,8 +1423,18 @@ ifneq ($$(ELF2DOL),)
 	$$(ELF2DOL) $$@ $$($1_$2)$$(DOLSUFFIX)
 endif
 endif
+ifeq ($$(PLATFORM),PSP2)
+	cp $($1_$2).elf $($1_$2)_unstripped.elf
+	arm-vita-eabi-strip -g $($1_$2).elf
+	vita-elf-create $($1_$2).elf $($1_$2).velf
+	vita-make-fself -s $($1_$2).velf $($1_$2).bin
+	cp $($1_$2).bin platform/PSVita/eboot.bin
+	vita-mksfoex -s TITLE_ID=BLOOD0032 -d ATTRIBUTE2=12 "NBlood" platform/PSVita/sce_sys/param.sfo
+	7z a -tzip ./NBlood.vpk -r ./platform/PSVita/sce_sys ./platform/PSVita/eboot.bin
+else
 ifneq ($$(STRIP),)
 	$$(STRIP) $$@ $$($1_$2_stripflags)
+endif
 endif
 ifeq ($$(PLATFORM),DARWIN)
 	cp -RPf "platform/Apple/bundles/$$($1_$2_proper).app" "./"

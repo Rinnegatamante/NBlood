@@ -2,6 +2,9 @@
 #define mutex_h_
 
 /* Mutual exclusion mechanism wrappers for the different platforms */
+#ifdef __PSP2__
+#include <vitasdk.h>
+#endif
 
 #ifdef RENDERTYPESDL
 # define SDL_MAIN_HANDLED
@@ -17,6 +20,8 @@ typedef SDL_SpinLock mutex_t;
 #elif defined _WIN32
 # include "windows_inc.h"
 typedef CRITICAL_SECTION mutex_t;
+#elif defined __PSP2__
+typedef SceUID mutex_t;
 #elif SDL_MAJOR_VERSION == 1
 typedef SDL_mutex * mutex_t;
 #else
@@ -32,6 +37,8 @@ static FORCE_INLINE void mutex_lock(mutex_t *mutex)
     SDL_AtomicLock(mutex);
 #elif defined _WIN32
     EnterCriticalSection(mutex);
+#elif defined __PSP2__
+	sceKernelLockMutex(*mutex, 1, NULL);
 #elif SDL_MAJOR_VERSION == 1
     SDL_LockMutex(*mutex);
 #endif
@@ -43,6 +50,8 @@ static FORCE_INLINE void mutex_unlock(mutex_t *mutex)
     SDL_AtomicUnlock(mutex);
 #elif defined _WIN32
     LeaveCriticalSection(mutex);
+#elif defined __PSP2__
+	sceKernelUnlockMutex(*mutex, 1);
 #elif SDL_MAJOR_VERSION == 1
     SDL_UnlockMutex(*mutex);
 #endif
@@ -54,6 +63,8 @@ static FORCE_INLINE bool mutex_try(mutex_t *mutex)
     return SDL_AtomicTryLock(mutex);
 #elif defined _WIN32
     return TryEnterCriticalSection(mutex);
+#elif defined __PSP2__
+	return !sceKernelTryLockMutex(*mutex, 1);
 #elif SDL_MAJOR_VERSION == 1
     return SDL_TryLockMutex(*mutex);
 #endif

@@ -21,7 +21,9 @@
 #ifdef __sun
 #include <sys/filio.h>
 #endif
+#ifndef __PSP2__
 #include <sys/ioctl.h>
+#endif
 #include <sys/socket.h>
 #include <netdb.h>
 #define SOCKET int
@@ -204,12 +206,14 @@ int netinit(int portnum)
     if (bind(mysock,(struct sockaddr *)&ip,sizeof(ip)) != SOCKET_ERROR)
     {
         myport = portnum;
+#ifndef __PSP2__
         if (gethostname(hostnam,sizeof(hostnam)) != SOCKET_ERROR)
             if ((lpHostEnt = gethostbyname(hostnam)))
             {
                 myip = ip.sin_addr.s_addr = *(int *)lpHostEnt->h_addr;
                 printf("mmulti: This machine's IP is %s\n", inet_ntoa(ip.sin_addr));
             }
+#endif
         return(1);
     }
     return(0);
@@ -869,7 +873,9 @@ int getexternaladdress(char *buffer, const char *host, int port)
 
     if ((h=gethostbyname(host)) == NULL)
     {
+#ifndef __PSP2__
         initprintf("mmulti: gethostbyname() error in getexternaladdress() (%d)\n",h_errno);
+#endif
         return(0);
     }
 

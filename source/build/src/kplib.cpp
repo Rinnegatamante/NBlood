@@ -54,6 +54,10 @@ static FORCE_INLINE CONSTEXPR int32_t klrotl(int32_t i, int sh) { return (i >> (
 #define ASMNAME(x)
 #endif
 
+#ifdef __PSP2__
+#include <vitasdk.h>
+#endif
+
 static intptr_t kp_frameplace;
 static int32_t kp_bytesperline, kp_xres, kp_yres;
 
@@ -1397,7 +1401,7 @@ static int32_t kpegrend(const char *kfilebuf, int32_t kfilength,
                     zz += dctx[z]*dcty[z];
                 }
                 z = zz*64*sizeof(int16_t);
-                dctbuf = (int16_t *)Xmalloc(z); if (!dctbuf) return -1;
+                dctbuf = (int16_t *)Bmalloc(z); if (!dctbuf) return -1;
                 Bmemset(dctbuf,0,z);
                 for (z=zz=0; z<gnumcomponents; z++) { dctptr[z] = &dctbuf[zz*64]; zz += dctx[z]*dcty[z]; }
             }
@@ -2393,14 +2397,14 @@ static int32_t kzcheckhashsiz(int32_t siz)
     if (!kzhashbuf) //Initialize hash table on first call
     {
         Bmemset(kzhashead,-1,sizeof(kzhashead));
-        kzhashbuf = (char *)Xmalloc(KZHASHINITSIZE); if (!kzhashbuf) return 0;
+        kzhashbuf = (char *)Bmalloc(KZHASHINITSIZE); if (!kzhashbuf) return 0;
         kzhashpos = 0; kzlastfnam = -1; kzhashsiz = KZHASHINITSIZE; kzdirnamhead = -1;
     }
     if (kzhashpos+siz > kzhashsiz) //Make sure string fits in kzhashbuf
     {
         int32_t i = kzhashsiz; do { i <<= 1; }
         while (kzhashpos+siz > i);
-        kzhashbuf = (char *)Xrealloc(kzhashbuf,i); if (!kzhashbuf) return 0;
+        kzhashbuf = (char *)Brealloc(kzhashbuf,i); if (!kzhashbuf) return 0;
         kzhashsiz = i;
     }
     return 1;
@@ -2422,7 +2426,7 @@ static int32_t kzcheckhash(const char *filnam, char **zipnam, int32_t *fileoffs,
 
     if (!kzhashbuf) return 0;
     if (filnam[0] == '|') filnam++;
-    for (i=kzhashead[kzcalchash(filnam)]; i>=0; i=(B_UNBUF32(&kzhashbuf[i])))
+    for (i=kzhashead[kzcalchash(filnam)]; i>=0; i=(B_UNBUF32(&kzhashbuf[i]))) {
         if (!filnamcmp(filnam,&kzhashbuf[i+21]))
         {
             (*zipnam) = &kzhashbuf[B_UNBUF32(&kzhashbuf[i+8])];
@@ -2431,6 +2435,7 @@ static int32_t kzcheckhash(const char *filnam, char **zipnam, int32_t *fileoffs,
             (*iscomp) = kzhashbuf[i+20];
             return 1;
         }
+	}
     return 0;
 }
 
@@ -2579,6 +2584,9 @@ intptr_t kzopen(const char *filnam)
     }
     if (kzcheckhash(filnam,&zipnam,&fileoffs,&fileleng,&iscomp)) //Then check mounted ZIP/GRP files
     {
+#ifdef __PSP2__
+		if (zipnam[0] == '.'){ zipnam += 2; }
+#endif
         fil = buildvfs_fopen_read(zipnam); if (!fil) return 0;
         buildvfs_fseek_abs(fil,fileoffs);
         if (!iscomp) //Must be from GRP file
@@ -2656,6 +2664,10 @@ intptr_t kzopen(const char *filnam)
 #if defined(_WIN32)
 static HANDLE hfind = INVALID_HANDLE_VALUE;
 static WIN32_FIND_DATA findata;
+#elif defined(__PSP2__)
+#define MAX_PATH 260
+static SceUID hfind = -1;
+static SceIoDirent findata;
 #else
 #include <dirent.h>
 #define MAX_PATH 260
@@ -2678,6 +2690,8 @@ void kzfindfilestart(const char *st)
 #if defined(_WIN32)
     if (hfind != INVALID_HANDLE_VALUE)
         { FindClose(hfind); hfind = INVALID_HANDLE_VALUE; }
+#elif defined(__PSP2__)
+	if (hfind >= 0) { sceIoDclose(hfind); hfind = -1; }
 #else
     if (hfind) { closedir(hfind); hfind = NULL; }
 #endif
@@ -2716,6 +2730,19 @@ int32_t kzfindfile(char *filnam)
                 if ((findata.cFileName[0] == '.') && (!findata.cFileName[1])) continue;
             strcpy(&filnam[i],findata.cFileName);
             if (findata.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) strcat(&filnam[i],"\\");
+#elif defined(__PSP2__)
+            if (hfind < 0)
+            {
+                char const *s = "ux0:data/EDuke32";
+                if (wildstpathleng > 0)
+                {
+                    filnam[wildstpathleng] = 0;
+                    s = filnam;
+                }
+                hfind = sceIoDopen(s);
+                if (hfind < 0) { if (!kzhashbuf) return 0; srchstat = 2; continue; }
+            }
+            break;   // process srchstat == 1
 #else
             if (!hfind)
             {
@@ -2748,6 +2775,18 @@ int32_t kzfindfile(char *filnam)
                 if ((findata.cFileName[0] == '.') && (!findata.cFileName[1])) continue;
             strcpy(&filnam[i],findata.cFileName);
             if (findata.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) strcat(&filnam[i],"\\");
+#elif defined(__PSP2__)
+			if (sceIoDread(hfind, &findata) <= 0)
+                { sceIoDclose(hfind); hfind = -1; if (!kzhashbuf) return 0; srchstat = 2; break; }
+            i = wildstpathleng;
+            if (S_ISDIR(findata.d_stat.st_mode))
+                { if (findata.d_name[0] == '.' && !findata.d_name[1]) continue; } //skip .
+            else if (S_ISREG(findata.d_stat.st_mode) || S_ISLNK(findata.d_stat.st_mode))
+                { if (findata.d_name[0] == '.') continue; } //skip hidden (dot) files
+            else continue; //skip devices and fifos and such
+            if (!wildmatch(findata.d_name,&newildst[wildstpathleng])) continue;
+            strcpy(&filnam[i],findata.d_name);
+            if (S_ISDIR(findata.d_stat.st_mode)) strcat(&filnam[i],"/");
 #else
             if ((findata = readdir(hfind)) == NULL)
                 { closedir(hfind); hfind = NULL; if (!kzhashbuf) return 0; srchstat = 2; break; }
@@ -3043,7 +3082,7 @@ void kpzdecode(int32_t const leng, intptr_t * const pic, int32_t * const xsiz, i
 
     kpgetdim(kpzbuf, leng, xsiz, ysiz);
 
-    *pic = (intptr_t)Xmalloc(*ysiz * ((*xsiz)<<2));
+    *pic = (intptr_t)Bmalloc(*ysiz * ((*xsiz)<<2));
     if (!*pic)
         return;
 
